@@ -8,30 +8,41 @@
   - schedule a walk
   - track pet care tasks
 - Briefly describe your initial UML design.
+  - It has four classes. An Owner has one or more Pets, and each Pet has Tasks. A Scheduler takes an Owner, pulls tasks from all of the owners's pets, and builds and displays a schedule.
 - What classes did you include, and what responsibilities did you assign to each?
-  - Owner
-    - name
-    - pets
-    - add_pet(pet)
-    - get_all_tasks()
-  - Pet
-    - name
-    - species
-    - age
-    - breed
-    - tasks
-    - add_task(task)
-    - remove_task(task)
-  - Task
-    - title
-    - duration
-    - priority
-    - mark_complete()
-  - Scheduler
-    - owner
-    - add_task()
-    - generate_schedule()
-    - display_schedule()
+  - Owner: represents the person using the app. 
+    - it holds 
+      - name: owner's name
+      - pets: their list of pets
+    - it has functions/responsibilities:
+      - add_pet(pet): registers a new pet
+      - get_all_tasks: gathers the tasks from every pets
+  - Pet: represents one animal. It stores pet's details, and owns its care tasks.
+    - Details:
+      - name
+      - species
+      - age
+      - breed
+      - tasks: pet's own list of tasks
+    - Functions:
+      - add_task(task)
+      - remove_task(task)
+  - Task: represents one care activity, such as walk, feeding, grooming.
+    - Task attributes:
+      - title
+      - duration
+      - priority
+      - time: scheduled time
+      - completed: flag for if the task is completed
+    - function:
+      - mark_complete(): update its status
+  - Scheduler: is the planning logic. It holds a reference to the Owner
+    - Attribute:
+      - owner
+    - Functions:
+      - add_task(pet, task): attach a task to a pet
+      - generate_schedule(): build an ordered list of tasks from the owner's pets
+      - display_schedule(): shows that plan to the user
 
 **b. Design changes**
 
