@@ -33,6 +33,7 @@
       - duration
       - priority
       - time: scheduled time
+      - frequency (added based on AI suggestion because each task may appears several times based on the frequency)
       - completed: flag for if the task is completed
     - function:
       - mark_complete(): update its status
