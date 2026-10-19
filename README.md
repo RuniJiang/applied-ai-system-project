@@ -83,14 +83,39 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
+All of these features live in [pawpal_system.py](pawpal_system.py).
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Sorting | `Scheduler.sort_by_time()` (also `generate_schedule()`) | Orders tasks by time of day |
+| Filtering | `Scheduler.filter_tasks()` | By completion status and/or pet name |
+| Conflict detection | `Scheduler.detect_conflicts()` | Warns when pending tasks share a start time |
+| Recurring tasks | `Task.mark_complete()`, `Scheduler.complete_task()` | Daily and weekly tasks respawn when completed |
+
+### Sorting
+
+`Scheduler.sort_by_time(tasks)` is a static method that returns a new list ordered earliest to latest. It sorts on minutes since midnight (via the `_time_to_minutes()` helper) instead of the raw string, so `"9:00"` correctly comes before `"10:00"`. The sort is stable, so tasks with the same time keep their input order, and the input list is not modified. An invalid time raises `ValueError`.
+
+`Scheduler.generate_schedule()` builds the daily plan from pending tasks due today or earlier. It sorts them by time first and then by priority (high → medium → low) to break ties.
+
+### Filtering
+
+`Scheduler.filter_tasks(completed=None, pet_name=None)` narrows the owner's tasks:
+
+- `completed=True` returns finished tasks and `completed=False` returns pending ones.
+- `pet_name="Mochi"` returns only that pet's tasks. The match is case-insensitive and ignores surrounding whitespace.
+- A filter left as `None` is not applied, so calling it with no arguments returns every task.
+- Both filters can be combined, and a task must match both.
+
+### Conflict detection
+
+`Scheduler.detect_conflicts()` is a lightweight check that returns a list of warning strings instead of raising errors or blocking the schedule. It groups pending tasks by (due date, start time). Any group with two or more tasks produces one warning that lists the tasks and says whether they belong to the same pet or to different pets. Completed tasks are ignored, and tasks with an unparseable time are skipped. Only identical start times are flagged, because durations are not compared, so partially overlapping tasks are not detected.
+
+### Recurring tasks
+
+Each `Task` has a `frequency` (`"once"`, `"daily"` or `"weekly"`) and a `due_date`. `Task.mark_complete()` sets `completed = True`. If the frequency is recurring, it returns a copy of the task with `completed = False` and the due date moved forward by 1 day (daily) or 7 days (weekly). One-off tasks return `None`.
+
+`Scheduler.complete_task(pet, task)` calls `mark_complete()` and adds the new occurrence to the same pet. The completed original stays in the list as a record, and `generate_schedule()` only shows the new occurrence once its due date arrives.
 
 ## 📸 Demo Walkthrough
 

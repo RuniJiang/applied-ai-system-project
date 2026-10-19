@@ -1,5 +1,6 @@
 """PawPal+ logic layer: classes for owners, pets, tasks, and scheduling."""
 
+from collections import defaultdict
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import List, Optional
@@ -9,7 +10,20 @@ RECURRENCE_DELTAS = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1)}
 
 
 def _time_to_minutes(time_str: str) -> int:
-    """Convert an "HH:MM" string (e.g. "8:30" or "08:30") to minutes since midnight."""
+    """Convert an "HH:MM" string (e.g. "8:30" or "08:30") to minutes since midnight.
+
+    Used as the numeric sort/grouping key for task times, since comparing raw
+    strings would misorder values like "9:00" and "10:00".
+
+    Args:
+        time_str: 24-hour time; surrounding whitespace is ignored.
+
+    Returns:
+        Minutes since midnight (0-1439).
+
+    Raises:
+        ValueError: If the string is not a valid "HH:MM" time.
+    """
     parsed = datetime.strptime(time_str.strip(), "%H:%M")
     return parsed.hour * 60 + parsed.minute
 
@@ -27,8 +41,14 @@ class Task:
     def mark_complete(self) -> Optional["Task"]:
         """Mark this task as completed.
 
-        For "daily" or "weekly" tasks, returns a new pending Task for the next
-        occurrence (due_date + 1 day or + 7 days); otherwise returns None.
+        Recurrence algorithm: look up frequency (case-insensitive) in
+        RECURRENCE_DELTAS; if found, copy this task with completed=False and
+        due_date advanced by that delta. The original is left as a completed
+        record, so history is preserved.
+
+        Returns:
+            A new pending Task for the next occurrence ("daily" = +1 day,
+            "weekly" = +7 days), or None for non-recurring tasks.
         """
         self.completed = True
         delta = RECURRENCE_DELTAS.get(self.frequency.lower())
@@ -83,7 +103,15 @@ class Scheduler:
     def complete_task(self, pet: Pet, task: Task) -> Optional[Task]:
         """Mark a pet's task complete and schedule its next occurrence if recurring.
 
-        Returns the newly created task, or None for one-off tasks.
+        Delegates to Task.mark_complete() and, when it yields a next
+        occurrence, attaches that task to the same pet.
+
+        Args:
+            pet: The pet that owns the task.
+            task: The task to complete.
+
+        Returns:
+            The newly created task, or None for one-off tasks.
         """
         next_task = task.mark_complete()
         if next_task is not None:
@@ -96,6 +124,16 @@ class Scheduler:
         """Return tasks filtered by completion status and/or pet name (case-insensitive).
 
         A filter left as None is not applied, so no arguments returns all tasks.
+        Filters combine with AND. Pets are narrowed first by name, then each
+        remaining pet's tasks are checked against the completion flag (O(n)).
+
+        Args:
+            completed: True for done tasks, False for pending, None for both.
+            pet_name: Pet to restrict to (surrounding whitespace ignored), or
+                None for all pets.
+
+        Returns:
+            Matching tasks in pet order, then insertion order.
         """
         pets = self.owner.pets
         if pet_name is not None:
@@ -109,7 +147,15 @@ class Scheduler:
 
     @staticmethod
     def sort_by_time(tasks: List[Task]) -> List[Task]:
-        """Return tasks sorted chronologically by their "HH:MM" time (earliest first)."""
+        """Return tasks sorted chronologically by their "HH:MM" time (earliest first).
+
+        Sorts on minutes since midnight rather than the raw string, so "9:00"
+        correctly precedes "10:00". The sort is stable (ties keep input order)
+        and does not mutate the input list.
+
+        Raises:
+            ValueError: If any task has an unparseable time.
+        """
         return sorted(tasks, key=lambda t: _time_to_minutes(t.time))
 
     def detect_conflicts(self) -> List[str]:
@@ -119,8 +165,16 @@ class Scheduler:
         due date, and start at the same "HH:MM" (durations are not compared).
         Works across pets as well as within one pet. Never raises for a task
         with an unparseable time; that task is skipped.
+
+        Algorithm: bucket pending tasks in a dict keyed by (due_date, start
+        minutes), then report every bucket holding 2+ tasks. Single pass plus
+        a sort of the buckets, so O(n + k log k) for n tasks and k buckets.
+
+        Returns:
+            One warning string per conflicting bucket, ordered by date then
+            time; empty list if there are no conflicts.
         """
-        groups = {}
+        groups = defaultdict(list)
         for pet in self.owner.pets:
             for task in pet.tasks:
                 if task.completed:
@@ -129,17 +183,17 @@ class Scheduler:
                     start = _time_to_minutes(task.time)
                 except ValueError:
                     continue
-                groups.setdefault((task.due_date, start), []).append((pet, task))
+                groups[(task.due_date, start)].append((pet, task))
 
         warnings = []
         for (due, start), entries in sorted(groups.items()):
             if len(entries) < 2:
                 continue
-            pets = {pet.name for pet, _ in entries}
-            scope = "same pet" if len(pets) == 1 else "different pets"
+            hh, mm = divmod(start, 60)
+            scope = "same pet" if len({p.name for p, _ in entries}) == 1 else "different pets"
             details = ", ".join(f"'{t.title}' ({p.name})" for p, t in entries)
             warnings.append(
-                f"WARNING: {len(entries)} tasks at {start // 60:02d}:{start % 60:02d} "
+                f"WARNING: {len(entries)} tasks at {hh:02d}:{mm:02d} "
                 f"on {due} ({scope}): {details}"
             )
         return warnings

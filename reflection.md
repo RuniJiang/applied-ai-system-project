@@ -63,7 +63,9 @@
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+  - `detect_conflicts()` only flags pending tasks that share the same due date and the exact same start time ("HH:MM"). It does not compare durations, so a 60-minute task at 09:00 and a task at 09:30 overlap in real life but are not reported.
 - Why is that tradeoff reasonable for this scenario?
+  - A pet owner mostly needs a quick heads-up that two things were scheduled at the same moment, and exact-match grouping is simple to read, easy to test, and runs in one pass over the tasks. Real overlap detection would need sorting by start time and tracking end times, which adds complexity for a small app where durations are rough estimates anyway. The check also never crashes: tasks with an unparseable time are skipped instead of raising, and it returns warnings rather than blocking the user from adding a task. Overlap detection is a natural next step if durations become more precise.
 
 ---
 
