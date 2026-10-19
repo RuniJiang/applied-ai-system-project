@@ -3,9 +3,35 @@
 ## 1. System Design
 
 **a. Initial design**
-
+- core actions:
+  - add a pet
+  - schedule a walk
+  - track pet care tasks
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+  - Owner
+    - name
+    - pets
+    - add_pet(pet)
+    - get_all_tasks()
+  - Pet
+    - name
+    - species
+    - age
+    - breed
+    - tasks
+    - add_task(task)
+    - remove_task(task)
+  - Task
+    - title
+    - duration
+    - priority
+    - mark_complete()
+  - Scheduler
+    - owner
+    - add_task()
+    - generate_schedule()
+    - display_schedule()
 
 **b. Design changes**
 
