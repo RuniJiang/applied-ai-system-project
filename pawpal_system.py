@@ -1,10 +1,11 @@
 """PawPal+ logic layer: classes for owners, pets, tasks, and scheduling."""
 
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, timedelta
 from typing import List, Optional
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+RECURRENCE_DELTAS = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1)}
 
 
 def _time_to_minutes(time_str: str) -> int:
@@ -21,10 +22,19 @@ class Task:
     time: str  # e.g. "08:00"
     frequency: str = "once"  # e.g. "once", "daily", "weekly"
     completed: bool = False
+    due_date: date = field(default_factory=date.today)
 
-    def mark_complete(self) -> None:
-        """Mark this task as completed."""
+    def mark_complete(self) -> Optional["Task"]:
+        """Mark this task as completed.
+
+        For "daily" or "weekly" tasks, returns a new pending Task for the next
+        occurrence (due_date + 1 day or + 7 days); otherwise returns None.
+        """
         self.completed = True
+        delta = RECURRENCE_DELTAS.get(self.frequency.lower())
+        if delta is None:
+            return None
+        return replace(self, completed=False, due_date=self.due_date + delta)
 
 
 @dataclass
@@ -70,6 +80,16 @@ class Scheduler:
             self.owner.add_pet(pet)
         pet.add_task(task)
 
+    def complete_task(self, pet: Pet, task: Task) -> Optional[Task]:
+        """Mark a pet's task complete and schedule its next occurrence if recurring.
+
+        Returns the newly created task, or None for one-off tasks.
+        """
+        next_task = task.mark_complete()
+        if next_task is not None:
+            pet.add_task(next_task)
+        return next_task
+
     def filter_tasks(
         self, completed: Optional[bool] = None, pet_name: Optional[str] = None
     ) -> List[Task]:
@@ -93,8 +113,13 @@ class Scheduler:
         return sorted(tasks, key=lambda t: _time_to_minutes(t.time))
 
     def generate_schedule(self) -> List[Task]:
-        """Return all of the owner's pending tasks, ordered by time then priority."""
-        pending = [t for t in self.owner.get_all_tasks() if not t.completed]
+        """Return the owner's pending tasks due today or earlier, ordered by time then priority."""
+        today = date.today()
+        pending = [
+            t
+            for t in self.owner.get_all_tasks()
+            if not t.completed and t.due_date <= today
+        ]
         return sorted(
             pending,
             key=lambda t: (

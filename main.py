@@ -30,8 +30,9 @@ def main() -> None:
     scheduler.add_task(mochi, Task("Evening walk", 30, "medium", "17:00", "daily"))
 
     # Complete a couple so the completion filter has something to show.
-    morning_walk.mark_complete()
-    breakfast.mark_complete()
+    # Daily tasks automatically spawn a new instance due tomorrow.
+    scheduler.complete_task(mochi, morning_walk)
+    scheduler.complete_task(luna, breakfast)
 
     all_tasks = scheduler.filter_tasks()
     print_tasks("Insertion order (unsorted):", all_tasks)
