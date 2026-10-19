@@ -67,19 +67,37 @@ Today's schedule for Runi:
 
 ## 🧪 Testing PawPal+
 
+Run the full test suite from the project root:
+
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
+### What the tests cover
+
+- **Task completion:** marking a task complete flips its status.
+- **Recurrence logic:** completing a daily task creates a pending copy due the next day (including across month boundaries); weekly tasks advance 7 days; one-off tasks create nothing.
+- **Sorting correctness:** tasks come back in chronological order by real time (so `9:00` sorts before `10:00`), without mutating the input.
+- **Conflict detection:** pending tasks sharing a date and start time are flagged (across pets too, and `8:00` matches `08:00`); completed tasks and different dates are not.
+- **Pet task management:** adding a task increases the pet's task count.
+
+### Sample test output
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.13.15, pytest-9.1.1, pluggy-1.7.0
+rootdir: /Users/runijiang/Documents/GitHub/ai110-module2show-pawpal-starter
+plugins: anyio-4.15.1
+collected 7 items
+
+tests/test_pawpal.py .......                                             [100%]
+
+============================== 7 passed in 0.01s ===============================
 ```
+
+### Confidence Level: ⭐⭐⭐⭐ (4/5)
+
+All 7 tests pass and cover the core behaviors: sorting, recurrence, and conflict detection. I stop short of 5 stars because some paths are untested: filtering, `generate_schedule`, invalid time strings (one bad time raises in sorting and scheduling), duplicate recurrences from completing the same task twice, and overlapping durations (conflicts only compare start times).
 
 ## 📐 Smarter Scheduling
 
