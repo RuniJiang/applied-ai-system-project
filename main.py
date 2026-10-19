@@ -59,6 +59,18 @@ def main() -> None:
     print()
     scheduler.display_schedule()
 
+    print("\nConflict check (no conflicts expected):")
+    print("  " + ("\n  ".join(scheduler.detect_conflicts()) or "(none)"))
+
+    # Two tasks for different pets at 17:00 (Mochi already has Evening walk then),
+    # plus two for the same pet at 18:00 (Luna already has Play session then).
+    scheduler.add_task(luna, Task("Grooming", 20, "medium", "17:00", "once"))
+    scheduler.add_task(luna, Task("Medication", 5, "high", "18:00", "once"))
+
+    print("\nConflict check after adding overlapping tasks:")
+    for warning in scheduler.detect_conflicts():
+        print(f"  {warning}")
+
 
 if __name__ == "__main__":
     main()

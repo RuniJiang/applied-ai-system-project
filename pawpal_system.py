@@ -112,6 +112,38 @@ class Scheduler:
         """Return tasks sorted chronologically by their "HH:MM" time (earliest first)."""
         return sorted(tasks, key=lambda t: _time_to_minutes(t.time))
 
+    def detect_conflicts(self) -> List[str]:
+        """Return a warning message for each group of pending tasks sharing a start time.
+
+        Lightweight check: tasks conflict when they are pending, have the same
+        due date, and start at the same "HH:MM" (durations are not compared).
+        Works across pets as well as within one pet. Never raises for a task
+        with an unparseable time; that task is skipped.
+        """
+        groups = {}
+        for pet in self.owner.pets:
+            for task in pet.tasks:
+                if task.completed:
+                    continue
+                try:
+                    start = _time_to_minutes(task.time)
+                except ValueError:
+                    continue
+                groups.setdefault((task.due_date, start), []).append((pet, task))
+
+        warnings = []
+        for (due, start), entries in sorted(groups.items()):
+            if len(entries) < 2:
+                continue
+            pets = {pet.name for pet, _ in entries}
+            scope = "same pet" if len(pets) == 1 else "different pets"
+            details = ", ".join(f"'{t.title}' ({p.name})" for p, t in entries)
+            warnings.append(
+                f"WARNING: {len(entries)} tasks at {start // 60:02d}:{start % 60:02d} "
+                f"on {due} ({scope}): {details}"
+            )
+        return warnings
+
     def generate_schedule(self) -> List[Task]:
         """Return the owner's pending tasks due today or earlier, ordered by time then priority."""
         today = date.today()
