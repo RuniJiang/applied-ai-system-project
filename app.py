@@ -107,6 +107,85 @@ else:
 
 st.divider()
 
+conflicts = scheduler.detect_conflicts()
+all_tasks = owner.get_all_tasks()
+
+st.subheader("Task Overview")
+m1, m2, m3 = st.columns(3)
+m1.metric("Pending", sum(not t.completed for t in all_tasks))
+m2.metric("Completed", sum(t.completed for t in all_tasks))
+m3.metric("Conflicts", len(conflicts))
+
+if conflicts:
+    st.warning(
+        f"{len(conflicts)} scheduling conflict(s) found. "
+        "Consider moving one of the tasks to a different time."
+    )
+    for warning in conflicts:
+        st.warning(warning.removeprefix("WARNING: "), icon="⚠️")
+elif all_tasks:
+    st.success("No scheduling conflicts. You're all set!")
+
+st.subheader("All Tasks")
+
+if all_tasks:
+    fcol1, fcol2 = st.columns(2)
+    with fcol1:
+        pet_filter = st.selectbox("Pet", ["All"] + [p.name for p in owner.pets])
+    with fcol2:
+        status_filter = st.selectbox("Status", ["All", "Pending", "Completed"])
+
+    filtered = scheduler.filter_tasks(
+        completed={"All": None, "Pending": False, "Completed": True}[status_filter],
+        pet_name=None if pet_filter == "All" else pet_filter,
+    )
+    pet_obj_of = {id(t): p for p in owner.pets for t in p.tasks}
+    ordered = scheduler.sort_by_time(filtered)
+
+    if not ordered:
+        st.info("No tasks match these filters.")
+    else:
+        st.caption(f"Showing {len(ordered)} task(s), sorted by time.")
+        st.table(
+            [
+                {
+                    "Time": t.time,
+                    "Task": t.title,
+                    "Pet": pet_obj_of[id(t)].name,
+                    "Duration (min)": t.duration,
+                    "Priority": t.priority.capitalize(),
+                    "Frequency": t.frequency.capitalize(),
+                    "Due": t.due_date.isoformat(),
+                    "Status": "✅ Done" if t.completed else "⏳ Pending",
+                }
+                for t in ordered
+            ]
+        )
+
+    pending = [t for t in ordered if not t.completed]
+    if pending:
+        labels = [
+            f"{t.time} · {t.title} ({pet_obj_of[id(t)].name}, due {t.due_date})"
+            for t in pending
+        ]
+        choice = st.selectbox("Mark a task complete", range(len(pending)), format_func=labels.__getitem__)
+        if st.button("Mark complete"):
+            t = pending[choice]
+            next_task = scheduler.complete_task(pet_obj_of[id(t)], t)
+            st.session_state.flash = (
+                f"Completed '{t.title}'. Next {t.frequency} occurrence scheduled for {next_task.due_date}."
+                if next_task
+                else f"Completed '{t.title}'."
+            )
+            st.rerun()
+else:
+    st.info("No tasks yet. Add a pet and a task above.")
+
+if "flash" in st.session_state:
+    st.success(st.session_state.pop("flash"))
+
+st.divider()
+
 st.subheader("Build Schedule")
 
 if st.button("Generate schedule"):
@@ -116,6 +195,9 @@ if st.button("Generate schedule"):
     else:
         pet_of = {id(t): p.name for p in owner.pets for t in p.tasks}
         st.success(f"Today's schedule for {owner.name}")
+        if conflicts:
+            st.warning(f"{len(conflicts)} conflict(s) detected. See the warnings above.")
+        st.caption("Ordered by time, then priority.")
         st.table(
             [
                 {
