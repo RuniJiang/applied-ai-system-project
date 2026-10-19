@@ -46,22 +46,82 @@ pip install -r requirements.txt
 
 The logic layer lives in [pawpal_system.py](pawpal_system.py) and is built from four classes:
 
-- **Task** (dataclass): one care activity with a title, duration, priority, time, frequency, and completion flag. `mark_complete()` marks it done.
+- **Task** (dataclass): one care activity with a title, duration, priority, time, frequency, completion flag and due date. `mark_complete()` marks it done and, for daily/weekly tasks, returns a new task for the next occurrence (or `None` for one-off tasks).
 - **Pet** (dataclass): a pet's profile plus its own list of `Task`s, managed with `add_task()` and `remove_task()`.
 - **Owner** (dataclass): holds a list of `Pet`s. `add_pet()` registers a pet, and `get_all_tasks()` flattens every pet's tasks into one list.
-- **Scheduler**: wraps an `Owner`. `add_task(pet, task)` attaches a task to a pet (registering the pet if it is new). `generate_schedule()` collects all pending tasks from the owner and sorts them by time, then priority (high → low). `display_schedule()` prints the result with each task's pet name.
+- **Scheduler**: wraps an `Owner` and works across all of its pets.
+  - `add_task(pet, task)` attaches a task to a pet (registering the pet if it is new).
+  - `complete_task(pet, task)` completes a task and attaches its next occurrence if it recurs.
+  - `filter_tasks(completed, pet_name)` filters by status and/or pet.
+  - `sort_by_time(tasks)` orders tasks chronologically.
+  - `detect_conflicts()` returns warnings for pending tasks that share a start time.
+  - `generate_schedule()` collects pending tasks due today or earlier, sorted by time then priority (high → low).
+  - `display_schedule()` prints the result with each task's pet name.
 
-How they fit together: `Owner` → has many `Pet`s → each has many `Task`s. The `Scheduler` sits on top of that hierarchy, reads tasks through the `Owner`, and produces the ordered daily plan. [main.py](main.py) is a demo script that builds sample data and prints the schedule.
+How they fit together: `Owner` → has many `Pet`s → each has many `Task`s. The `Scheduler` sits on top of that hierarchy, reads tasks through the `Owner`, and produces the ordered daily plan. [main.py](main.py) is a demo script that builds sample data and exercises each scheduler feature.
+
+### UML diagram
+
+Source: [diagrams/uml_final.mmd](diagrams/uml_final.mmd) (the earlier draft is [diagrams/uml_draft.mmd](diagrams/uml_draft.mmd)).
+
+```mermaid
+classDiagram
+    class Owner {
+        +str name
+        +List~Pet~ pets
+        +add_pet(pet) void
+        +get_all_tasks() List~Task~
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +str breed
+        +int age
+        +List~Task~ tasks
+        +add_task(task) void
+        +remove_task(task) void
+    }
+
+    class Task {
+        +str title
+        +int duration
+        +str priority
+        +str time
+        +str frequency
+        +bool completed
+        +date due_date
+        +mark_complete() Task
+    }
+
+    class Scheduler {
+        +Owner owner
+        +add_task(pet, task) void
+        +complete_task(pet, task) Task
+        +filter_tasks(completed, pet_name) List~Task~
+        +sort_by_time(tasks)$ List~Task~
+        +detect_conflicts() List~str~
+        +generate_schedule() List~Task~
+        +display_schedule() void
+    }
+
+    Owner "1" --> "0..*" Pet : has
+    Pet "1" --> "0..*" Task : has
+    Scheduler "1" --> "1" Owner : manages
+    Scheduler ..> Pet : adds/completes tasks for
+    Scheduler ..> Task : sorts, filters, schedules
+    Task ..> Task : creates next occurrence
+```
 
 ## 🖥️ Sample Output
 
-Output from running `python3 main.py`, which builds an owner with two pets and four tasks and prints the generated schedule:
+Excerpt from running `python3 main.py`, which builds an owner with two pets and several tasks and prints the generated schedule (the full output is under [Sample CLI output](#sample-cli-output)):
 
 ```
 Today's schedule for Runi:
-  07:30  Morning walk (Mochi) - 30 min, high priority, daily
-  08:00  Breakfast (Luna) - 10 min, high priority, daily
+  10:00  Vet call (Luna) - 15 min, high priority, once
   12:00  Flea medication (Mochi) - 5 min, medium priority, weekly
+  17:00  Evening walk (Mochi) - 30 min, medium priority, daily
   18:00  Play session (Luna) - 20 min, low priority, daily
 ```
 

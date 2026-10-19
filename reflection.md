@@ -58,7 +58,14 @@
 **a. Constraints and priorities**
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
+  - Time: each task has an "HH:MM" start time, and the schedule is ordered by it (parsed to minutes, so "9:00" sorts before "10:00").
+  - Priority: high, medium or low breaks ties between tasks at the same time.
+  - Due date and completion: `generate_schedule()` only includes pending tasks due today or earlier.
+  - Recurrence: daily and weekly tasks spawn their next occurrence when completed.
+  - Conflicts: pending tasks sharing the same date and start time are flagged as warnings.
+  - Not considered: owner preferences and total time available in a day. Duration is stored and displayed but is not used to fit or drop tasks.
 - How did you decide which constraints mattered most?
+  - I started from what a pet owner needs: "what do I do, and when?" Time came first because a daily plan is a timeline. Priority came second as the tiebreaker, so the more important task is listed first when two are scheduled together. Due date and completion came next so the plan shows only what is actually left to do. I left out preferences and a daily time budget to keep the scheduler simple and testable.
 
 **b. Tradeoffs**
 
@@ -97,12 +104,24 @@
 **a. What you tested**
 
 - What behaviors did you test?
+  - Task completion: `mark_complete()` flips the status.
+  - Recurrence: completing a daily task creates a pending copy due the next day, and weekly and one-off tasks behave correctly.
+  - Sorting: tasks come back in true chronological order, so "9:00" comes before "10:00".
+  - Conflict detection: duplicate start times are flagged, and non-conflicting tasks are not.
+  - Task management: adding a task increases the pet's task count.
 - Why were these tests important?
+  - They cover the logic the schedule depends on. A wrong sort or a missed recurrence would silently give the owner a bad plan. Sorting and recurrence also have easy-to-miss bugs (string comparison of times, date rollover), so a test catches them where reading the code might not.
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
+  - Fairly confident (4/5) for the core behaviors. All 7 tests pass, and I checked the demo output by hand. I am less sure about unusual input, since the tests cover mostly the normal path.
 - What edge cases would you test next if you had more time?
+  - Tasks with overlapping durations but different start times, which the current check does not catch.
+  - Invalid or malformed times such as "25:00" or "abc". `detect_conflicts()` skips them, but `generate_schedule()` and `sort_by_time()` would raise.
+  - Recurrence across month and year boundaries, and with mixed-case frequency such as "Daily".
+  - Unknown priority values, an owner with no pets, and a pet with no tasks.
+  - Completing the same recurring task twice, which would create duplicate next occurrences.
 
 ---
 
@@ -111,11 +130,18 @@
 **a. What went well**
 
 - What part of this project are you most satisfied with?
+  - Designing the system as UML first and then building it in small steps. Because the classes had clear roles (Owner, Pet, Task, Scheduler), adding sorting, filtering, recurrence and conflict detection later did not require restructuring. I am also pleased that the logic layer is separate from the Streamlit UI, so the scheduler is easy to test on its own.
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
+  - Replace exact-time conflict detection with real overlap detection that uses duration.
+  - Use the owner's available time to decide which tasks fit in a day, and explain why tasks were included or dropped.
+  - Store priority and frequency as enums instead of strings, so invalid values cannot get in.
+  - Guard against completing the same recurring task twice.
+  - Validate the time input in the UI and save data between sessions.
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+  - AI is fast at producing code, but I have to stay the architect. My UML gave me something concrete to check each suggestion against, and tests proved the behavior. The AI's first sort, which treated priority as a string, looked plausible but was wrong, and I only caught it because I checked the output. Small, specific prompts tied to my own design worked best.

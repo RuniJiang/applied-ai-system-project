@@ -1,4 +1,4 @@
-"""Temporary testing ground for the PawPal+ logic layer."""
+"""Demo script for PawPal+: builds sample data and exercises the scheduler."""
 
 from pawpal_system import Owner, Pet, Scheduler, Task
 
