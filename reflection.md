@@ -33,7 +33,7 @@
       - duration
       - priority
       - time: scheduled time
-      - frequency (added based on AI suggestion because each task may appears several times based on the frequency)
+      - frequency
       - completed: flag for if the task is completed
     - function:
       - mark_complete(): update its status
@@ -48,8 +48,9 @@
 **b. Design changes**
 
 - Did your design change during implementation?
+  - yes. added a frequency in the task class
 - If yes, describe at least one change and why you made it.
-
+  - because each task may appears several times based on the frequency
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
@@ -71,12 +72,21 @@
 **a. How you used AI**
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
+  - Design brainstorming: I used AI to turn the scenario into a UML draft (Owner, Pet, Task, Scheduler) and then to convert that UML into class skeletons with docstrings and `pass` bodies.
+  - Implementation: I had AI fill in the method bodies in small steps, then add a demo script (`main.py`), quick tests, one-line docstrings, and the README implementation summary.
 - What kinds of prompts or questions were most helpful?
+  - Small, specific prompts that referenced my own design, e.g. "implement the stubs from the UML", worked better than open-ended ones, because the output could be checked against the diagram.
+  - Asking for a runnable demo right after the implementation was useful, since it showed the schedule output immediately.
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
+  - The AI's first version of `generate_schedule()` ordered tasks by time and priority. I did not take that as-is. Priority is stored as a string, and sorting those strings alphabetically gives "high", "low", "medium", which puts low priority ahead of medium. I kept the priority lookup (`PRIORITY_ORDER`) that maps high, medium and low to 0, 1 and 2, made it case-insensitive, and gave unknown values the lowest rank instead of raising an error.
+  - I also kept the AI's `frequency` suggestion only after checking it against my UML. It was not in my original design, so I added it deliberately and recorded the change in section 1b. I kept `remove_task` safe (it does nothing if the task is missing) and made `Scheduler.add_task` register a new pet, so a task is never attached to a pet the owner doesn't know about.
 - How did you evaluate or verify what the AI suggested?
+  - I compared each class and method against my UML to confirm nothing was renamed or dropped.
+  - I ran `python3 main.py` and checked the printed schedule by hand: tasks appear in time order, and ties are broken by priority.
+  - I added quick tests in `tests/test_pawpal.py` and ran `pytest` so the behaviour is checked by code, not only by reading it.
 
 ---
 

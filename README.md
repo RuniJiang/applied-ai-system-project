@@ -42,6 +42,17 @@ pip install -r requirements.txt
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
 
+## 🛠️ Implementation Summary
+
+The logic layer lives in [pawpal_system.py](pawpal_system.py) and is built from four classes:
+
+- **Task** (dataclass): one care activity with a title, duration, priority, time, frequency, and completion flag. `mark_complete()` marks it done.
+- **Pet** (dataclass): a pet's profile plus its own list of `Task`s, managed with `add_task()` and `remove_task()`.
+- **Owner** (dataclass): holds a list of `Pet`s. `add_pet()` registers a pet, and `get_all_tasks()` flattens every pet's tasks into one list.
+- **Scheduler**: wraps an `Owner`. `add_task(pet, task)` attaches a task to a pet (registering the pet if it is new). `generate_schedule()` collects all pending tasks from the owner and sorts them by time, then priority (high → low). `display_schedule()` prints the result with each task's pet name.
+
+How they fit together: `Owner` → has many `Pet`s → each has many `Task`s. The `Scheduler` sits on top of that hierarchy, reads tasks through the `Owner`, and produces the ordered daily plan. [main.py](main.py) is a demo script that builds sample data and prints the schedule.
+
 ## 🖥️ Sample Output
 
 Output from running `python3 main.py`, which builds an owner with two pets and four tasks and prints the generated schedule:

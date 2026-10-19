@@ -54,6 +54,7 @@ class Owner:
 
 class Scheduler:
     def __init__(self, owner: Owner) -> None:
+        """Create a scheduler that manages tasks for the given owner."""
         self.owner = owner
 
     def add_task(self, pet: Pet, task: Task) -> None:
