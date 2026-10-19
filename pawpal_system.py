@@ -1,9 +1,16 @@
 """PawPal+ logic layer: classes for owners, pets, tasks, and scheduling."""
 
 from dataclasses import dataclass, field
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def _time_to_minutes(time_str: str) -> int:
+    """Convert an "HH:MM" string (e.g. "8:30" or "08:30") to minutes since midnight."""
+    parsed = datetime.strptime(time_str.strip(), "%H:%M")
+    return parsed.hour * 60 + parsed.minute
 
 
 @dataclass
@@ -63,12 +70,37 @@ class Scheduler:
             self.owner.add_pet(pet)
         pet.add_task(task)
 
+    def filter_tasks(
+        self, completed: Optional[bool] = None, pet_name: Optional[str] = None
+    ) -> List[Task]:
+        """Return tasks filtered by completion status and/or pet name (case-insensitive).
+
+        A filter left as None is not applied, so no arguments returns all tasks.
+        """
+        pets = self.owner.pets
+        if pet_name is not None:
+            pets = [p for p in pets if p.name.lower() == pet_name.strip().lower()]
+        return [
+            t
+            for pet in pets
+            for t in pet.tasks
+            if completed is None or t.completed == completed
+        ]
+
+    @staticmethod
+    def sort_by_time(tasks: List[Task]) -> List[Task]:
+        """Return tasks sorted chronologically by their "HH:MM" time (earliest first)."""
+        return sorted(tasks, key=lambda t: _time_to_minutes(t.time))
+
     def generate_schedule(self) -> List[Task]:
         """Return all of the owner's pending tasks, ordered by time then priority."""
         pending = [t for t in self.owner.get_all_tasks() if not t.completed]
         return sorted(
             pending,
-            key=lambda t: (t.time, PRIORITY_ORDER.get(t.priority.lower(), len(PRIORITY_ORDER))),
+            key=lambda t: (
+                _time_to_minutes(t.time),
+                PRIORITY_ORDER.get(t.priority.lower(), len(PRIORITY_ORDER)),
+            ),
         )
 
     def display_schedule(self) -> None:
