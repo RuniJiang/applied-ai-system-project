@@ -1,0 +1,47 @@
+flowchart TD
+    %% ---------- INPUT ----------
+    U([Pet owner]) -->|pet profile + tasks| UI[Streamlit UI<br/>app.py]
+    UI --> SCH[Scheduler<br/>pawpal_system.py]
+
+    %% ---------- RAG PIPELINE ----------
+    UI -->|"Get AI suggestions"| PLAN[AI Planner<br/>ai_planner.py]
+    KB[(Knowledge base<br/>knowledge/*.md<br/>feeding, exercise, meds, grooming)]
+    PLAN -->|query: species, age, task type| RET[Retriever<br/>retriever.py]
+    KB --> RET
+    RET -->|top-k passages + match scores| PLAN
+    PLAN -->|prompt = pet profile + retrieved passages| LLM[[Claude API]]
+    LLM -->|JSON: tasks, durations, priorities, reasons, citations| GRD
+
+    %% ---------- GUARDRAILS ----------
+    subgraph GUARDS [Guardrails and reliability]
+        GRD{Validator<br/>schema check +<br/>safety rules<br/>no medication doses}
+        CONF[Confidence scorer<br/>retrieval strength +<br/>validation result]
+        LOG[(Log file<br/>pawpal.log)]
+    end
+    GRD -->|valid| CONF
+    GRD -->|invalid / API error / no docs| FALL[Fallback:<br/>rule-based scheduler]
+    GRD -.->|every step| LOG
+    RET -.-> LOG
+    PLAN -.-> LOG
+
+    %% ---------- OUTPUT ----------
+    CONF -->|suggestions + sources + confidence| REVIEW
+    FALL --> SCH
+    SCH -->|detect_conflicts, sort, generate_schedule| OUT[Daily plan + explanation<br/>shown in UI]
+
+    %% ---------- HUMAN CHECKPOINT ----------
+    REVIEW{{Human review<br/>owner sees sources + confidence<br/>accepts, edits or rejects}}
+    REVIEW -->|accepted tasks| SCH
+    OUT --> U
+
+    %% ---------- TESTING ----------
+    subgraph TEST [Automated testing]
+        PYT[pytest<br/>retriever, validator,<br/>scheduler tests]
+        EVAL[Evaluation script<br/>eval.py<br/>10-15 scenarios,<br/>pass/fail + avg confidence]
+    end
+    PYT -.->|checks| RET
+    PYT -.->|checks| GRD
+    PYT -.->|checks| SCH
+    EVAL -.->|runs end to end| PLAN
+    EVAL -.->|pass/fail report| DEV([Developer])
+    LOG -.->|review failures| DEV
