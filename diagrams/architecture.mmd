@@ -1,0 +1,24 @@
+flowchart TD
+    User([Pet owner]) -->|adds pets, tasks, completes tasks| UI
+
+    subgraph Interfaces
+        UI["app.py<br/>Streamlit UI"]
+        CLI["main.py<br/>CLI demo script"]
+    end
+
+    subgraph Core["pawpal_system.py"]
+        Owner["Owner<br/>name, pets"]
+        Pet["Pet<br/>name, species, tasks"]
+        Task["Task<br/>description, time, priority,<br/>frequency, due_date, completed"]
+        Scheduler["Scheduler<br/>sort_by_time, filter_tasks,<br/>detect_conflicts, generate_schedule"]
+    end
+
+    UI --> Scheduler
+    CLI --> Scheduler
+    Scheduler -->|reads tasks via| Owner
+    Owner -->|has many| Pet
+    Pet -->|has many| Task
+    Scheduler -->|mark_complete spawns next recurring task| Task
+    Scheduler -->|ordered plan + conflict warnings| UI
+
+    Tests["tests/test_pawpal.py<br/>pytest suite"] -.->|verifies| Core
