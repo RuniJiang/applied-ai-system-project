@@ -36,23 +36,28 @@ I used Claude as a coding and design partner across the project: drafting the UM
 
 **A suggestion I revised.** The AI's first `generate_schedule()` sorted tasks by priority as a string. That orders "high", "low", "medium", which puts low priority ahead of medium. It looked correct and I only caught it by reading the printed schedule. I replaced it with a `PRIORITY_ORDER` lookup (high, medium, low mapped to 0, 1, 2), made it case-insensitive and ranked unknown values last instead of raising an error. I then added tests so the behavior is checked by code.
 
-**A failure I found in the live model layer.** My first model choice (`gemini-2.5-flash`) was no longer available to new users, and `gemini-3.8-flash` timed out under load. The app only showed a generic "AI step failed" message. I found the cause in `pawpal.log`, then switched to a faster default model, added a 30 s timeout and added retries on temporary errors. The lesson was that failures need to be logged with enough detail to diagnose them, and that the app must degrade gracefully instead of hanging.
-
 ## Limitations and biases
 
 - **Small, hand-written knowledge base.** The guidance is only as good as the markdown files I wrote. It covers a limited set of species and topics and is not reviewed by a veterinarian. Anything not in it gets no suggestions, which is intended, but it means the system can feel unhelpful for less common pets.
 - **Keyword retrieval.** TF-IDF matching misses paraphrases ("stroll" for "walk") and favors short passages, so a general passage such as "Walk timing" can outrank a species-specific one. The right passage was always in the top 3 in my tests, but not always first.
-- **Biased toward the species and life stages I covered.** Dogs and cats get far better coverage than other animals. Breed, weight and health conditions are not considered, so advice for a 11-year-old Shiba Inu is the same as for any senior dog.
+- **Biased toward the species and life stages I covered.** Dogs and cats get far better coverage than other animals. Breed, weight and health conditions are not considered, so advice for an 11-year-old Shiba Inu is the same as for any senior dog.
 - **Safety filter is a regex.** It catches common dose phrasing ("5 mg", "half a tablet") but not every possible wording, and it can miss indirect requests. It is a safety net, not a guarantee.
 - **Confidence score is weakly informative.** In live runs it was nearly always close to 1.0, because the model rarely broke the rules and retrieval scores were high. A high score means the output was well-formed and grounded, not that the advice is correct.
 - **Model can still be wrong or inconsistent.** Even with grounding, Gemini may phrase things overconfidently or choose times that don't suit a particular household. The citation check proves the source was retrieved, not that the model represented it accurately.
-- **Evaluation is narrow.** 24 scenarios written by me, with mechanical pass criteria. They cannot catch subtle quality problems.
+- **Evaluation is narrow.** 26 scenarios written by me, with mechanical pass criteria. They cannot catch subtle quality problems.
 - **Scheduler gaps remain.** Conflict detection compares start times only, not overlapping durations, and the app does not save data between sessions.
-- **Privacy.** Pet details and the request text are sent to the Gemini API. Use of the API key and `.env` file is kept out of version control.
+- **Privacy.** Pet details and the request text are sent to the Gemini API. The API key lives in `.env`, which is kept out of version control.
 
 ## Misuse and mitigations
 
-The main risk is someone treating the output as veterinary advice, especially for medication or a sick animal. Mitigations are the dose-blocking filter, the refusal message pointing to a vet, the knowledge base excluding medication dosing, and the human review step. A real deployment would also need a visible disclaimer, a vet-reviewed knowledge base and monitoring of real user requests.
+**Could it be misused?** Yes. The main risk is someone treating the output as veterinary advice, especially for medication or a sick animal. A second risk is a user phrasing a dose request indirectly to get past the filter. Mitigations are the dose-blocking filter, the refusal message pointing to a vet, the knowledge base excluding medication dosing, and the human review step. A real deployment would also need a visible disclaimer, a vet-reviewed knowledge base and monitoring of real user requests.
+
+## What surprised me while testing reliability
+
+- **Retrieval, not the prompt, was the weak point.** An 11-year-old dog's senior passage lost to the puppy passage, so the suggestions would have been worse. Most of my debugging went into life-stage weighting and query terms rather than prompt wording. When the right passage was in the prompt, Gemini used it: it suggested three 20-minute walks and explained that older dogs do better with shorter outings.
+- **Confidence barely moved on real output.** I expected the score to vary across live runs. It averaged 0.98 (range 0.89 to 1.0) because the model rarely broke the rules. It only dropped meaningfully (0.62) on my hand-built partly invalid batch. A high score tells me the output was well-formed, not that it was good.
+- **The model itself was the unreliable part.** My first choice (`gemini-2.5-flash`) was no longer available to new users, and `gemini-3.8-flash` timed out under load. The app showed only a generic "AI step failed" message. I found the cause in `pawpal.log`, then switched to a faster default model, added a 30 s timeout and added retries on temporary errors. The lesson was that failures need enough logged detail to diagnose, and that the app must degrade to the rule-based scheduler instead of hanging.
+- **Empty input needed explicit tests.** I added empty and whitespace-only requests to `eval.py` so graceful handling is checked rather than assumed.
 
 ## What I would do next
 
