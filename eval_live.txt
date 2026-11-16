@@ -1,0 +1,68 @@
+
+Retrieval quality (expected passage in top 3)
+  [PASS] retrieval: senior dog exercise  (top=['general_routine.md#Walk timing'])
+  [PASS] retrieval: puppy exercise  (top=['general_routine.md#Walk timing'])
+  [PASS] retrieval: adult dog feeding  (top=['dog_feeding.md#Adult dog feeding schedule'])
+  [PASS] retrieval: kitten feeding  (top=['cat_care.md#Kitten feeding'])
+  [PASS] retrieval: cat play  (top=['cat_care.md#Cat play and enrichment'])
+  [PASS] retrieval: cat litter  (top=['cat_care.md#Litter box care'])
+  [PASS] retrieval: dog grooming  (top=['grooming.md#Brushing frequency'])
+  [PASS] retrieval: nail trimming  (top=['grooming.md#Nail trimming'])
+  [PASS] retrieval: preventive meds  (top=['medication_safety.md#Preventive care schedule'])
+
+Guardrails
+  [PASS] dose request blocked, LLM never called
+  [PASS] invalid items dropped, valid kept  (kept=1 rejected=3)
+  [PASS] confidence drops when output is partly invalid  (confidence=0.62)
+
+Fallbacks
+  [PASS] no relevant guidance -> fallback
+  [PASS] LLM exception -> fallback
+  [PASS] empty input handled gracefully
+  [PASS] whitespace-only input handled gracefully
+  [PASS] non-JSON reply -> fallback
+
+Live end-to-end (real Gemini API)
+  [PASS] live: senior dog exercise  (suggestions=3 rejected=0 confidence=1.0)
+  [PASS] live: puppy exercise  (suggestions=3 rejected=0 confidence=1.0)
+  [PASS] live: adult dog feeding  (suggestions=5 rejected=0 confidence=1.0)
+  [PASS] live: kitten feeding  (suggestions=4 rejected=0 confidence=1.0)
+  [PASS] live: cat play  (suggestions=3 rejected=0 confidence=1.0)
+  [PASS] live: cat litter  (suggestions=2 rejected=0 confidence=1.0)
+  [PASS] live: dog grooming  (suggestions=1 rejected=0 confidence=0.89)
+  [PASS] live: nail trimming  (suggestions=1 rejected=0 confidence=0.99)
+  [PASS] live: preventive meds  (suggestions=3 rejected=0 confidence=0.97)
+  average confidence over live runs: 0.98
+
+Results table (markdown)
+
+| Test | Input | Evaluation criteria | Result |
+|------|-------|---------------------|--------|
+| retrieval: senior dog exercise | dog, age 11, "exercise walk" | dog_exercise.md#Senior dog exercise in top 3 | Pass |
+| retrieval: puppy exercise | dog, age 0, "exercise walk" | dog_exercise.md#Puppy exercise in top 3 | Pass |
+| retrieval: adult dog feeding | dog, age 4, "feeding meals schedule" | dog_feeding.md#Adult dog feeding schedule in top 3 | Pass |
+| retrieval: kitten feeding | cat, age 0, "feeding meals" | cat_care.md#Kitten feeding in top 3 | Pass |
+| retrieval: cat play | cat, age 4, "play enrichment toys" | cat_care.md#Cat play and enrichment in top 3 | Pass |
+| retrieval: cat litter | cat, age 6, "litter box scoop" | cat_care.md#Litter box care in top 3 | Pass |
+| retrieval: dog grooming | dog, age 3, "brushing grooming coat" | grooming.md#Brushing frequency in top 3 | Pass |
+| retrieval: nail trimming | cat, age 5, "nail trim" | grooming.md#Nail trimming in top 3 | Pass |
+| retrieval: preventive meds | dog, age 5, "flea heartworm preventive reminder" | medication_safety.md#Preventive care schedule in top 3 | Pass |
+| dose request blocked, LLM never called | "how much ibuprofen to give" | returns vet message; LLM not called | Pass |
+| invalid items dropped, valid kept | 4 items: 1 valid, dose, fake citation, bad time | 1 kept, 3 rejected | Pass |
+| confidence drops when output is partly invalid | same partly invalid batch | confidence < 0.9 | Pass |
+| no relevant guidance -> fallback | cat, "swimming lessons" | fallback=True | Pass |
+| LLM exception -> fallback | LLM raises ZeroDivisionError | fallback=True | Pass |
+| empty input handled gracefully | '' | no crash; fallback=True | Pass |
+| whitespace-only input handled gracefully | '   ' | no crash; fallback=True | Pass |
+| non-JSON reply -> fallback | LLM replies "hello" | fallback=True | Pass |
+| live: senior dog exercise | dog, age 11, "exercise walk" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: puppy exercise | dog, age 0, "exercise walk" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: adult dog feeding | dog, age 4, "feeding meals schedule" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: kitten feeding | cat, age 0, "feeding meals" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: cat play | cat, age 4, "play enrichment toys" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: cat litter | cat, age 6, "litter box scoop" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: dog grooming | dog, age 3, "brushing grooming coat" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: nail trimming | cat, age 5, "nail trim" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+| live: preventive meds | dog, age 5, "flea heartworm preventive reminder" | no fallback; >=1 suggestion; citations retrieved; no doses | Pass |
+
+26/26 scenarios passed

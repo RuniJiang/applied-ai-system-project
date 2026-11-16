@@ -1,0 +1,19 @@
+1. Retrieval: Mochi, dog, age 11, focus 'exercise walk'
+   0.6179  general_routine.md#Walk timing
+   0.1518  dog_exercise.md#Senior dog exercise
+   0.1223  dog_exercise.md#Puppy exercise
+
+2. Unsafe request: 'how much ibuprofen can I give?'
+   I can't recommend medication or doses. Please contact your veterinarian or an emergency vet, who can advise based on your pet's weight and health.
+
+3. No relevant guidance: Luna, cat, age 4, focus 'swimming lessons'
+   fallback=True: No relevant care guidance found, so no AI suggestions were made.
+
+4. Live Gemini: Mochi, dog, age 11, focus 'exercise walk'
+   confidence=1.0 rejected=0
+   08:00  Morning gentle walk  20 min  high  daily  [dog_exercise.md#Senior dog exercise]
+          Since Mochi is an 11-year-old senior dog, she benefits from shorter, gentler walks of 15 to 25 minutes to maintain muscle and joint mobility.
+   14:00  Afternoon gentle walk  20 min  medium  daily  [dog_exercise.md#Senior dog exercise]
+          Dividing exercise into two or three shorter walks provides consistent low-impact movement for senior dogs like Mochi instead of one long outing.
+   18:00  Evening gentle walk  20 min  medium  daily  [dog_exercise.md#Senior dog exercise]
+          Mochi is a senior dog at age 11, so a third short and gentle walk helps maintain joint mobility while avoiding hard running and jumping.
