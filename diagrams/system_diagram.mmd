@@ -37,7 +37,7 @@ flowchart TD
     %% ---------- TESTING ----------
     subgraph TEST [Automated testing]
         PYT[pytest<br/>retriever, validator,<br/>scheduler tests]
-        EVAL[Evaluation script<br/>eval.py<br/>10-15 scenarios,<br/>pass/fail + avg confidence]
+        EVAL[Evaluation script<br/>eval.py<br/>17 offline + 9 live scenarios,<br/>pass/fail + avg confidence]
     end
     PYT -.->|checks| RET
     PYT -.->|checks| GRD
