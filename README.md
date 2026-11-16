@@ -169,7 +169,28 @@ The original scheduler behavior is demonstrated in [docs/pawpal_core_reference.m
 
 **Unit tests:** `python -m pytest` runs 35 tests, all passing: the 7 original scheduler tests plus 28 for the AI layer. They cover retrieval ranking and species filtering, the validator (11 malformed-suggestion cases), dose and safety rules, JSON parsing, confidence bounds, and the planner's fallbacks. They also check that retrieved text actually appears in the prompt, and that unsafe requests never reach the model.
 
-**Evaluation script:** `python eval.py` passes 15/15 offline scenarios: 9 retrieval cases (expected passage in the top 3), 3 guardrail cases and 3 fallback cases. `python eval.py --live` adds 9 end-to-end runs through the real Gemini API, and all 9 pass (at least one suggestion, every citation is a retrieved passage, no doses). Average confidence was 0.98, ranging from 0.89 to 1.0, with 0 suggestions rejected. Total: 24/24.
+**Evaluation script:** `python eval.py` passes 17/17 offline scenarios: 9 retrieval cases (expected passage in the top 3), 3 guardrail cases and 5 fallback cases (including empty and whitespace-only input). `python eval.py --live` adds 9 end-to-end runs through the real Gemini API, and all 9 pass (at least one suggestion, every citation is a retrieved passage, no doses). Average confidence was 0.98, ranging from 0.89 to 1.0, with 0 suggestions rejected. Total: 26/26. The script also prints the results as a markdown table; the offline results are below.
+
+| Test | Input | Evaluation criteria | Result |
+|------|-------|---------------------|--------|
+| retrieval: senior dog exercise | dog, age 11, "exercise walk" | dog_exercise.md#Senior dog exercise in top 3 | Pass |
+| retrieval: puppy exercise | dog, age 0, "exercise walk" | dog_exercise.md#Puppy exercise in top 3 | Pass |
+| retrieval: adult dog feeding | dog, age 4, "feeding meals schedule" | dog_feeding.md#Adult dog feeding schedule in top 3 | Pass |
+| retrieval: kitten feeding | cat, age 0, "feeding meals" | cat_care.md#Kitten feeding in top 3 | Pass |
+| retrieval: cat play | cat, age 4, "play enrichment toys" | cat_care.md#Cat play and enrichment in top 3 | Pass |
+| retrieval: cat litter | cat, age 6, "litter box scoop" | cat_care.md#Litter box care in top 3 | Pass |
+| retrieval: dog grooming | dog, age 3, "brushing grooming coat" | grooming.md#Brushing frequency in top 3 | Pass |
+| retrieval: nail trimming | cat, age 5, "nail trim" | grooming.md#Nail trimming in top 3 | Pass |
+| retrieval: preventive meds | dog, age 5, "flea heartworm preventive reminder" | medication_safety.md#Preventive care schedule in top 3 | Pass |
+| dose request blocked, LLM never called | "how much ibuprofen to give" | returns vet message; LLM not called | Pass |
+| invalid items dropped, valid kept | 4 items: 1 valid, dose, fake citation, bad time | 1 kept, 3 rejected | Pass |
+| confidence drops when output is partly invalid | same partly invalid batch | confidence < 0.9 | Pass |
+| no relevant guidance -> fallback | cat, "swimming lessons" | fallback=True | Pass |
+| LLM exception -> fallback | LLM raises ZeroDivisionError | fallback=True | Pass |
+| empty input handled gracefully | '' | no crash; fallback=True | Pass |
+| whitespace-only input handled gracefully | '   ' | no crash; fallback=True | Pass |
+| non-JSON reply -> fallback | LLM replies "hello" | fallback=True | Pass |
+
 
 **What worked:** life-stage weighting fixed an early problem where an 11-year-old dog's senior passage didn't beat the puppy passage. Excluding the species name from the query terms fixed irrelevant queries like "swimming lessons" returning cat passages.
 

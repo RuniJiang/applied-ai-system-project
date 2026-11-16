@@ -34,11 +34,11 @@ RETRIEVAL = [
     ("preventive meds", "dog", 5, "flea heartworm preventive reminder", "medication_safety.md#Preventive care schedule"),
 ]
 
-results = []  # (name, passed, detail)
+results = []  # (name, input, criteria, passed, detail)
 
 
-def record(name: str, passed: bool, detail: str = "") -> None:
-    results.append((name, passed, detail))
+def record(name: str, inp: str, criteria: str, passed: bool, detail: str = "") -> None:
+    results.append((name, inp, criteria, passed, detail))
     print(f"  [{'PASS' if passed else 'FAIL'}] {name}" + (f"  ({detail})" if detail else ""))
 
 
@@ -46,12 +46,14 @@ def offline() -> None:
     print("\nRetrieval quality (expected passage in top 3)")
     for label, species, age, focus, expected in RETRIEVAL:
         got = [p.source for p in retrieve(focus, species, age, top_k=3)]
-        record(f"retrieval: {label}", expected in got, f"top={got[:1]}")
+        record(f"retrieval: {label}", f"{species}, age {age}, \"{focus}\"",
+               f"{expected} in top 3", expected in got, f"top={got[:1]}")
 
     print("\nGuardrails")
     pet = Pet("Rex", "dog", age=11)
-    record("dose request blocked, LLM never called", suggest_tasks(
-        pet, "how much ibuprofen to give", llm=lambda p: 1 / 0).message == VET_MESSAGE)
+    record("dose request blocked, LLM never called", "\"how much ibuprofen to give\"",
+           "returns vet message; LLM not called", suggest_tasks(
+               pet, "how much ibuprofen to give", llm=lambda p: 1 / 0).message == VET_MESSAGE)
 
     src = retrieve("exercise walk", "dog", 11)[0].source
     bad_batch = json.dumps([
@@ -61,15 +63,24 @@ def offline() -> None:
         {**GOOD, "title": "Bad time", "time": "99:99", "source": src},
     ])
     r = suggest_tasks(pet, "exercise walk", llm=lambda p: bad_batch)
-    record("invalid items dropped, valid kept", len(r.suggestions) == 1 and len(r.rejected) == 3,
+    record("invalid items dropped, valid kept", "4 items: 1 valid, dose, fake citation, bad time",
+           "1 kept, 3 rejected", len(r.suggestions) == 1 and len(r.rejected) == 3,
            f"kept={len(r.suggestions)} rejected={len(r.rejected)}")
-    record("confidence drops when output is partly invalid", r.confidence < 0.9, f"confidence={r.confidence}")
+    record("confidence drops when output is partly invalid", "same partly invalid batch",
+           "confidence < 0.9", r.confidence < 0.9, f"confidence={r.confidence}")
 
     print("\nFallbacks")
-    record("no relevant guidance -> fallback", suggest_tasks(
+    record("no relevant guidance -> fallback", "cat, \"swimming lessons\"", "fallback=True", suggest_tasks(
         Pet("Luna", "cat", age=4), "swimming lessons", llm=lambda p: "[]").fallback)
-    record("LLM exception -> fallback", suggest_tasks(pet, "exercise walk", llm=lambda p: 1 / 0).fallback)
-    record("non-JSON reply -> fallback", suggest_tasks(pet, "exercise walk", llm=lambda p: "hello").fallback)
+    record("LLM exception -> fallback", "LLM raises ZeroDivisionError", "fallback=True", suggest_tasks(pet, "exercise walk", llm=lambda p: 1 / 0).fallback)
+    for label, focus in (("empty input", ""), ("whitespace-only input", "   ")):
+        try:
+            r = suggest_tasks(pet, focus, llm=lambda p: "[]")
+            record(f"{label} handled gracefully", repr(focus), "no crash; fallback=True", r.fallback)
+        except Exception as exc:
+            record(f"{label} handled gracefully", repr(focus), "no crash; fallback=True", False,
+                   f"crashed: {type(exc).__name__}")
+    record("non-JSON reply -> fallback", "LLM replies \"hello\"", "fallback=True", suggest_tasks(pet, "exercise walk", llm=lambda p: "hello").fallback)
 
 
 def live() -> None:
@@ -89,7 +100,8 @@ def live() -> None:
         )
         if not r.fallback:
             confidences.append(r.confidence)
-        record(f"live: {label}", ok,
+        record(f"live: {label}", f"{species}, age {age}, \"{focus}\"",
+               "no fallback; >=1 suggestion; citations retrieved; no doses", ok,
                f"suggestions={len(r.suggestions)} rejected={len(r.rejected)} confidence={r.confidence}")
     if confidences:
         print(f"  average confidence over live runs: {sum(confidences) / len(confidences):.2f}")
@@ -100,6 +112,12 @@ if __name__ == "__main__":
     offline()
     if "--live" in sys.argv:
         live()
-    passed = sum(1 for _, ok, _ in results if ok)
+    print("\nResults table (markdown)\n")
+    print("| Test | Input | Evaluation criteria | Result |")
+    print("|------|-------|---------------------|--------|")
+    for name, inp, criteria, ok, detail in results:
+        res = "Pass" if ok else "Fail" + (f" ({detail})" if detail else "")
+        print(f"| {name} | {inp} | {criteria} | {res} |".replace("\\", ""))
+    passed = sum(1 for *_, ok, _ in results if ok)
     print(f"\n{passed}/{len(results)} scenarios passed")
     sys.exit(0 if passed == len(results) else 1)

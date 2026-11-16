@@ -22,7 +22,7 @@
 | Check | Result |
 |-------|--------|
 | Unit tests (`pytest`) | 35/35 pass |
-| Offline scenarios (`eval.py`) | 15/15 pass (9 retrieval, 3 guardrail, 3 fallback) |
+| Offline scenarios (`eval.py`) | 17/17 pass (9 retrieval, 3 guardrail, 5 fallback); per-scenario table in README |
 | Live Gemini scenarios (`eval.py --live`) | 9/9 pass |
 | Live average confidence | 0.98 (range 0.89 to 1.0), 0 suggestions rejected |
 
