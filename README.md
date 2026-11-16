@@ -1,6 +1,6 @@
 # PawPal+ AI: A Retrieval-Augmented Pet Care Planner
 
-> **Status:** the RAG planner, guardrails, evaluation harness and UI are built and tested: 35 unit tests, 15 offline scenarios and 9 live Gemini scenarios all pass. The reflection and `model_card.md` are still **[TODO]**.
+> **Status:** the RAG planner, guardrails, evaluation harness and UI are built and tested: 35 unit tests, 15 offline scenarios and 9 live Gemini scenarios all pass. The responsible-AI write-up is in [model_card.md](model_card.md).
 
 ## Original project
 
@@ -16,7 +16,57 @@ The retrieved text changes what gets scheduled and how it is explained. It is no
 
 ## Architecture overview
 
-Diagram source: [diagrams/system_diagram.mmd](diagrams/system_diagram.mmd) (Mermaid; GitHub renders it, or paste it into the Mermaid live editor).
+The diagram below renders on GitHub. Its source is [diagrams/system_diagram.mmd](diagrams/system_diagram.mmd).
+
+```mermaid
+flowchart TD
+    %% ---------- INPUT ----------
+    U([Pet owner]) -->|pet profile + tasks| UI[Streamlit UI<br/>app.py]
+    UI --> SCH[Scheduler<br/>pawpal_system.py]
+
+    %% ---------- RAG PIPELINE ----------
+    UI -->|"Get AI suggestions"| PLAN[AI Planner<br/>ai_planner.py]
+    KB[(Knowledge base<br/>knowledge/*.md<br/>feeding, exercise, meds, grooming)]
+    PLAN -->|query: species, age, task type| RET[Retriever<br/>retriever.py]
+    KB --> RET
+    RET -->|top-k passages + match scores| PLAN
+    PLAN -->|prompt = pet profile + retrieved passages| LLM[[Gemini API]]
+    LLM -->|JSON: tasks, durations, priorities, reasons, citations| GRD
+
+    %% ---------- GUARDRAILS ----------
+    subgraph GUARDS [Guardrails and reliability]
+        GRD{Validator<br/>schema check +<br/>safety rules<br/>no medication doses}
+        CONF[Confidence scorer<br/>retrieval strength +<br/>validation result]
+        LOG[(Log file<br/>pawpal.log)]
+    end
+    GRD -->|valid| CONF
+    GRD -->|invalid / API error / no docs| FALL[Fallback:<br/>rule-based scheduler]
+    GRD -.->|every step| LOG
+    RET -.-> LOG
+    PLAN -.-> LOG
+
+    %% ---------- OUTPUT ----------
+    CONF -->|suggestions + sources + confidence| REVIEW
+    FALL --> SCH
+    SCH -->|detect_conflicts, sort, generate_schedule| OUT[Daily plan + explanation<br/>shown in UI]
+
+    %% ---------- HUMAN CHECKPOINT ----------
+    REVIEW{{Human review<br/>owner sees sources + confidence<br/>accepts, edits or rejects}}
+    REVIEW -->|accepted tasks| SCH
+    OUT --> U
+
+    %% ---------- TESTING ----------
+    subgraph TEST [Automated testing]
+        PYT[pytest<br/>retriever, validator,<br/>scheduler tests]
+        EVAL[Evaluation script<br/>eval.py<br/>15 offline + 9 live scenarios,<br/>pass/fail + avg confidence]
+    end
+    PYT -.->|checks| RET
+    PYT -.->|checks| GRD
+    PYT -.->|checks| SCH
+    EVAL -.->|runs end to end| PLAN
+    EVAL -.->|pass/fail report| DEV([Developer])
+    LOG -.->|review failures| DEV
+```
 
 | Component | File | Role |
 |-----------|------|------|
@@ -26,7 +76,7 @@ Diagram source: [diagrams/system_diagram.mmd](diagrams/system_diagram.mmd) (Merm
 | Validator | `ai_planner.py` | Checks schema (valid priority, positive duration, valid time) and safety rules (no medication doses) |
 | Confidence scorer | `ai_planner.py` | Combines retrieval strength and validation outcome into a 0-1 score |
 | Scheduler | `pawpal_system.py` | Existing logic: sorting, conflicts, recurrence, daily plan; also the fallback path |
-| Tests | `tests/`, `eval.py` | pytest unit tests plus an end-to-end evaluation over 10-15 scenarios |
+| Tests | `tests/`, `eval.py` | pytest unit tests plus an evaluation over 15 offline and 9 live scenarios |
 | Logging | `pawpal.log` (created at runtime) | Records retrieval hits, API calls, validation failures and fallbacks |
 
 **Data flow:** owner input → retriever → planner (prompt with retrieved passages) → Gemini → validator → confidence scorer → **human review** → scheduler → daily plan with explanations. Any validation failure, API error or empty retrieval routes to the rule-based fallback.
@@ -136,9 +186,13 @@ The original scheduler behavior is demonstrated in [docs/pawpal_core_reference.m
 
 ## Reflection
 
-**[TODO: write after the build.]** Prompts to answer: what did building retrieval teach me about how much an LLM's answer depends on what it is given? Where did validation catch something I wouldn't have noticed? What would I do differently?
+Building the retrieval step showed me how much an LLM's answer depends on what it is given. With the senior-dog passage in the prompt, Gemini suggested three 20-minute walks and explained that older dogs do better with shorter outings. That came from the passage, not from the model's general knowledge. When retrieval ranked the wrong passage first (the puppy passage beat the senior one for an 11-year-old dog), the suggestions would have been worse, so most of my debugging went into retrieval rather than prompts.
 
-The graded responsible-AI reflection (collaboration with AI, one suggestion accepted and one rejected or revised, limitations) goes in `model_card.md`, not here.
+Validation and logging caught things I would not have noticed by reading output. The log showed that a retired model name and a slow model were the real cause of a vague "AI step failed" message. The tests showed that a keyword retriever returned cat passages for "swimming lessons" until I removed the species name from the query terms.
+
+The bigger lesson is that most of the reliability came from the code around the model: validating output, citing sources, falling back to the original scheduler and keeping the owner in the loop. Confidence scores were less useful than I expected, because they stayed near 1.0 and only measured well-formedness, not quality. If I did it again I would get a vet or experienced owner to rate sample suggestions early, and I would test retrieval with paraphrased queries from the start.
+
+My collaboration with AI, an accepted and a revised suggestion, and the system's limitations are in [model_card.md](model_card.md).
 
 ## Project structure
 
@@ -154,5 +208,5 @@ retriever.py           passage retrieval (TF-IDF + life-stage weighting)
 ai_planner.py          prompt, Gemini call, validation, guardrails, confidence
 eval.py                evaluation harness (offline, plus --live)
 .env.example           template for GEMINI_API_KEY
-model_card.md          [TODO] responsible-AI reflection
+model_card.md          responsible-AI reflection and limitations
 ```
