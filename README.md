@@ -1,6 +1,14 @@
 # PawPal+ AI: A Retrieval-Augmented Pet Care Planner
 
-> **Status:** the RAG planner, guardrails, evaluation harness and UI are built and tested: 35 unit tests, 15 offline scenarios and 9 live Gemini scenarios all pass. The responsible-AI write-up is in [model_card.md](model_card.md).
+> **Status:** the RAG planner, guardrails, evaluation harness and UI are built and tested: 35 unit tests, 17 offline scenarios and 9 live Gemini scenarios all pass. The responsible-AI write-up is in [model_card.md](model_card.md).
+
+## Portfolio
+
+- **Code:** https://github.com/RuniJiang/applied-ai-system-project
+<!-- - **Video walkthrough (optional):** Loom link: _add here_ -->
+- **Grading evidence:** everything needed to check the system is in this README: [Sample interactions](#sample-interactions) (commands, inputs, outputs), [Testing summary](#testing-summary) (results table), `sample_run.txt` and `eval_live.txt` (raw logs).
+
+**What this project says about me as an AI engineer.** I treat the model as one unreliable component inside a system I have to be able to verify. I grounded Gemini in retrieved passages so each suggestion cites a source, then wrapped it in validation, safety filters, a confidence score, logging and a fallback to the original scheduler, so the app still works when the model doesn't. I checked AI output against my own design and tests instead of trusting it (for example catching a priority sort that ranked "low" above "medium"), and I scoped features to what I could test. I also report what the evaluation can't show: my pass criteria are mechanical, confidence stays near 1.0, and the advice has not been reviewed by a vet.
 
 ## Original project
 
@@ -58,7 +66,7 @@ flowchart TD
     %% ---------- TESTING ----------
     subgraph TEST [Automated testing]
         PYT[pytest<br/>retriever, validator,<br/>scheduler tests]
-        EVAL[Evaluation script<br/>eval.py<br/>15 offline + 9 live scenarios,<br/>pass/fail + avg confidence]
+        EVAL[Evaluation script<br/>eval.py<br/>17 offline + 9 live scenarios,<br/>pass/fail + avg confidence]
     end
     PYT -.->|checks| RET
     PYT -.->|checks| GRD
@@ -90,7 +98,7 @@ flowchart TD
 Requires Python 3.10+.
 
 ```bash
-git clone <this-repo-url>
+git clone https://github.com/RuniJiang/applied-ai-system-project.git
 cd applied-ai-system-project
 
 python -m venv .venv
@@ -124,35 +132,42 @@ Without an API key the app still works. It uses the original rule-based schedule
 
 ## Sample interactions
 
-The first three are real output captured from the code in this repo with no API key set. Those paths (retrieval, guardrails, fallback) don't call the model.
+Reproduce everything below with:
 
-**1. Retrieval for a senior dog.** Input: Mochi, dog, age 11, focus "exercise walk".
+```bash
+python demo.py                   # four inputs end to end; the output is saved in sample_run.txt
+python eval.py --live            # 26 scenarios; the output is saved in eval_live.txt
 ```
-0.6179  general_routine.md#Walk timing
-0.1518  dog_exercise.md#Senior dog exercise
-0.1223  dog_exercise.md#Puppy exercise
-```
-The senior passage outranks the puppy passage because the pet's life stage boosts matching headings. The planner passes these three passages to Gemini.
 
-**2. Unsafe request blocked.** Input: "how much ibuprofen can I give?"
-```
-Blocked: I can't recommend medication or doses. Please contact your veterinarian or an
-emergency vet, who can advise based on your pet's weight and health.
-```
-The model is never called.
+Output of `python demo.py` (captured with a Gemini key set, so input 4 is a live call to `gemini-3.5-flash-lite`):
 
-**3. No relevant guidance.** Input: cat, focus "swimming lessons" → `No relevant care guidance found, so no AI suggestions were made.` With no API key set, a normal request gives `No API key set, so AI suggestions are unavailable.` In both cases the app keeps working through the original scheduler.
+```
+1. Retrieval: Mochi, dog, age 11, focus 'exercise walk'
+   0.6179  general_routine.md#Walk timing
+   0.1518  dog_exercise.md#Senior dog exercise
+   0.1223  dog_exercise.md#Puppy exercise
 
-**4. Live Gemini suggestions for a senior dog.** Input: Mochi, Shiba Inu, age 11, focus "exercise walk". Real output from `gemini-3.5-flash-lite`, confidence 100%, 0 rejected:
+2. Unsafe request: 'how much ibuprofen can I give?'
+   I can't recommend medication or doses. Please contact your veterinarian or an emergency vet, who can advise based on your pet's weight and health.
+
+3. No relevant guidance: Luna, cat, age 4, focus 'swimming lessons'
+   fallback=True: No relevant care guidance found, so no AI suggestions were made.
+
+4. Live Gemini: Mochi, dog, age 11, focus 'exercise walk'
+   confidence=1.0 rejected=0
+   08:00  Morning gentle walk  20 min  high  daily  [dog_exercise.md#Senior dog exercise]
+          Since Mochi is an 11-year-old senior dog, she benefits from shorter, gentler walks of 15 to 25 minutes to maintain muscle and joint mobility.
+   14:00  Afternoon gentle walk  20 min  medium  daily  [dog_exercise.md#Senior dog exercise]
+          Dividing exercise into two or three shorter walks provides consistent low-impact movement for senior dogs like Mochi instead of one long outing.
+   18:00  Evening gentle walk  20 min  medium  daily  [dog_exercise.md#Senior dog exercise]
+          Mochi is a senior dog at age 11, so a third short and gentle walk helps maintain joint mobility while avoiding hard running and jumping.
 ```
-08:00  Morning Walk    20 min  high    daily   [dog_exercise.md#Senior dog exercise]
-       Since Mochi is an 11-year-old senior dog, this shorter, gentler walk helps maintain muscle and joint mobility.
-14:00  Afternoon Walk  20 min  medium  daily   [dog_exercise.md#Senior dog exercise]
-       As a senior dog, Mochi benefits from two or three shorter walks a day instead of one long outing.
-18:00  Evening Walk    20 min  medium  daily   [dog_exercise.md#Senior dog exercise]
-       Providing a third gentle walk for senior dogs like Mochi helps support joint mobility and overall movement.
-```
-The durations (20 min) and the "two or three shorter walks" pattern come from the retrieved senior-dog passage, not from the model's general knowledge. In the UI the owner ticks which of these to add to the schedule.
+
+**What each case shows**
+1. **Retrieval (RAG).** The top 3 passages are what the planner gives Gemini. The life-stage boost puts the senior-dog passage above the puppy passage, though the short general "Walk timing" passage still ranks first (a known limit, see below).
+2. **Guardrail.** A dose request is blocked before any model call and the owner is pointed to a vet.
+3. **Fallback.** With no relevant guidance the planner makes no suggestions and the app keeps working through the original scheduler. With no API key a normal request gives `No API key set, so AI suggestions are unavailable.`
+4. **Grounded suggestions.** The 20-minute durations and the "two or three shorter walks" pattern come from the retrieved senior-dog passage. Every suggestion cites a retrieved source, confidence is 1.0, 0 rejected. The exact wording varies between runs. In the UI the owner ticks which suggestions to add to the schedule.
 
 The original scheduler behavior is demonstrated in [docs/pawpal_core_reference.md](docs/pawpal_core_reference.md#sample-cli-output).
 
@@ -169,7 +184,7 @@ The original scheduler behavior is demonstrated in [docs/pawpal_core_reference.m
 
 **Unit tests:** `python -m pytest` runs 35 tests, all passing: the 7 original scheduler tests plus 28 for the AI layer. They cover retrieval ranking and species filtering, the validator (11 malformed-suggestion cases), dose and safety rules, JSON parsing, confidence bounds, and the planner's fallbacks. They also check that retrieved text actually appears in the prompt, and that unsafe requests never reach the model.
 
-**Evaluation script:** `python eval.py` passes 17/17 offline scenarios: 9 retrieval cases (expected passage in the top 3), 3 guardrail cases and 5 fallback cases (including empty and whitespace-only input). `python eval.py --live` adds 9 end-to-end runs through the real Gemini API, and all 9 pass (at least one suggestion, every citation is a retrieved passage, no doses). Average confidence was 0.98, ranging from 0.89 to 1.0, with 0 suggestions rejected. Total: 26/26. The script also prints the results as a markdown table; the offline results are below.
+**Evaluation script:** `python eval.py` passes 17/17 offline scenarios: 9 retrieval cases (expected passage in the top 3), 3 guardrail cases and 5 fallback cases (including empty and whitespace-only input). `python eval.py --live` adds 9 end-to-end runs through the real Gemini API, and all 9 pass (at least one suggestion, every citation is a retrieved passage, no doses). Average confidence was 0.98, ranging from 0.89 to 1.0, with 0 suggestions rejected. Total: 26/26 (raw log: `eval_live.txt`). The script also prints the results as a markdown table; the offline results are below.
 
 | Test | Input | Evaluation criteria | Result |
 |------|-------|---------------------|--------|
@@ -228,6 +243,9 @@ knowledge/             pet-care documents used for retrieval
 retriever.py           passage retrieval (TF-IDF + life-stage weighting)
 ai_planner.py          prompt, Gemini call, validation, guardrails, confidence
 eval.py                evaluation harness (offline, plus --live)
+demo.py                four-input end-to-end demo
+sample_run.txt         saved output of demo.py
+eval_live.txt          saved output of eval.py --live
 .env.example           template for GEMINI_API_KEY
 model_card.md          responsible-AI reflection and limitations
 ```
