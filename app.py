@@ -2,7 +2,10 @@ import datetime
 
 import streamlit as st
 
+from ai_planner import configure_logging, suggest_tasks
 from pawpal_system import Owner, Pet, Task, Scheduler
+
+configure_logging()
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -104,6 +107,57 @@ if owner.pets:
         st.success(f"Added '{task_title}' for {target_name}.")
 else:
     st.info("Add a pet before scheduling tasks.")
+
+st.divider()
+
+st.subheader("AI Care Suggestions")
+st.caption(
+    "Retrieves pet-care guidance for your pet's species and age, then asks Gemini to "
+    "suggest tasks grounded in it. You review every suggestion before it is added."
+)
+if owner.pets:
+    ai_name = st.selectbox("Suggest tasks for", [p.name for p in owner.pets], key="ai_pet")
+    focus = st.text_input("What do you need help with?", value="daily exercise feeding grooming")
+    if st.button("Get AI suggestions"):
+        ai_pet = next(p for p in owner.pets if p.name == ai_name)
+        with st.spinner("Retrieving guidance and planning..."):
+            st.session_state.ai_result = (ai_name, suggest_tasks(ai_pet, focus, existing=ai_pet.tasks))
+
+    if "ai_result" in st.session_state:
+        res_name, res = st.session_state.ai_result
+        if res.blocked:
+            st.error(res.message)
+        elif res.fallback:
+            st.warning(res.message + " Add tasks manually above.")
+        else:
+            st.metric("Confidence", f"{res.confidence:.0%}")
+            if res.confidence < 0.5:
+                st.warning("Low confidence: double-check these against your vet's advice.")
+            picks = []
+            for i, s in enumerate(res.suggestions):
+                if st.checkbox(
+                    f"{s.time} · {s.title} ({s.duration} min, {s.priority}, {s.frequency})",
+                    value=True, key=f"pick_{i}",
+                ):
+                    picks.append(s)
+                st.caption(f"{s.reason}  \nSource: {s.source}")
+            if res.rejected:
+                with st.expander(f"{len(res.rejected)} suggestion(s) rejected by guardrails"):
+                    for r in res.rejected:
+                        st.write("- " + r)
+            if st.button("Add selected to schedule") and picks:
+                target = next(p for p in owner.pets if p.name == res_name)
+                for s in picks:
+                    scheduler.add_task(target, s.to_task())
+                del st.session_state.ai_result
+                st.session_state.flash = f"Added {len(picks)} AI-suggested task(s) for {res_name}."
+                st.rerun()
+        if res.passages and not res.blocked:
+            with st.expander("Sources retrieved"):
+                for p in res.passages:
+                    st.markdown(f"**{p.source}** (score {p.score})  \n{p.text}")
+else:
+    st.info("Add a pet to get AI suggestions.")
 
 st.divider()
 

@@ -9,7 +9,7 @@ flowchart TD
     PLAN -->|query: species, age, task type| RET[Retriever<br/>retriever.py]
     KB --> RET
     RET -->|top-k passages + match scores| PLAN
-    PLAN -->|prompt = pet profile + retrieved passages| LLM[[Claude API]]
+    PLAN -->|prompt = pet profile + retrieved passages| LLM[[Gemini API]]
     LLM -->|JSON: tasks, durations, priorities, reasons, citations| GRD
 
     %% ---------- GUARDRAILS ----------
