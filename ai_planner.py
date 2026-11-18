@@ -158,9 +158,15 @@ def build_prompt(pet: Pet, passages: List[Passage], existing: List[Task]) -> str
     stage = life_stage(pet.species, pet.age)
     docs = "\n\n".join(f"[{p.source}]\n{p.text}" for p in passages)
     have = "\n".join(f"- {t.time} {t.title}" for t in existing) or "(none)"
+    details = []
+    if pet.weight_kg > 0:
+        details.append(f"weight: {pet.weight_kg:g} kg")
+    if pet.notes.strip():
+        details.append(f"owner notes: {pet.notes.strip()}")
+    extra = ("\n" + ", ".join(details)) if details else ""
     return f"""You help a pet owner plan care tasks. Use ONLY the reference passages below; do not use outside knowledge.
 
-Pet: {pet.name}, {pet.species}, breed: {pet.breed or 'unknown'}, age: {pet.age} ({stage})
+Pet: {pet.name}, {pet.species}, breed: {pet.breed or 'unknown'}, age: {pet.age} ({stage}){extra}
 
 Reference passages (cite by the id in brackets):
 {docs}

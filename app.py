@@ -39,14 +39,25 @@ with tab_pets:
     owner.name = st.text_input("Owner name", value=owner.name)
 
     st.subheader("Add a Pet")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         pet_name = st.text_input("Pet name", value="Mochi")
     with col2:
         species_choice = st.selectbox("Species", COMMON_SPECIES + ["Other"])
+    with col3:
+        pet_age = st.number_input("Age (years)", min_value=0, max_value=40, value=0, step=1)
     species = species_choice.lower()
     if species_choice == "Other":
         species = st.text_input("Enter species", placeholder="e.g. ferret, axolotl").strip().lower()
+
+    with st.expander("Optional details"):
+        dcol1, dcol2 = st.columns(2)
+        with dcol1:
+            breed = st.text_input("Breed", placeholder="e.g. Shiba Inu")
+        with dcol2:
+            weight_kg = st.number_input("Weight (kg, optional)", min_value=0.0, max_value=150.0,
+                                        value=None, step=0.5, placeholder="Leave blank if unknown")
+        notes = st.text_area("Health or behaviour notes", placeholder="e.g. stiff hips, anxious around other dogs")
 
     if st.button("Add pet"):
         if not pet_name.strip():
@@ -56,12 +67,22 @@ with tab_pets:
         elif any(p.name.lower() == pet_name.strip().lower() for p in owner.pets):
             st.warning(f"{pet_name} is already on your list.")
         else:
-            owner.add_pet(Pet(name=pet_name.strip(), species=species))
+            owner.add_pet(Pet(
+                name=pet_name.strip(), species=species, age=int(pet_age),
+                breed=breed.strip(), weight_kg=float(weight_kg or 0.0), notes=notes.strip(),
+            ))
             st.success(f"Added {pet_name}.")
 
     if owner.pets:
         st.write("Your pets:")
-        st.table([{"name": p.name, "species": p.species, "tasks": len(p.tasks)} for p in owner.pets])
+        st.table([
+            {
+                "name": p.name, "species": p.species, "age": p.age,
+                "breed": p.breed or "-", "weight (kg)": f"{p.weight_kg:g}" if p.weight_kg else "-",
+                "tasks": len(p.tasks),
+            }
+            for p in owner.pets
+        ])
     else:
         st.info("No pets yet. Add one above.")
 
@@ -119,6 +140,15 @@ with tab_ai:
                 st.warning(res.message + " Add tasks manually above.")
             else:
                 st.metric("Confidence", f"{res.confidence:.0%}")
+                n_valid = len(res.suggestions)
+                n_total = n_valid + len(res.rejected)
+                top = res.passages[0] if res.passages else None
+                if top:
+                    st.caption(
+                        f"50% retrieval strength: best passage `{top.source}` scored {top.score:.2f} "
+                        f"(full marks at 0.50 or more). "
+                        f"50% validity: {n_valid} of {n_total} suggestions passed the guardrails."
+                    )
                 if res.confidence < 0.5:
                     st.warning("Low confidence: double-check these against your vet's advice.")
                 picks = []

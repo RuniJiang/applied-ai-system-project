@@ -64,6 +64,8 @@ class Pet:
     breed: str = ""
     age: int = 0
     tasks: List[Task] = field(default_factory=list)
+    weight_kg: float = 0.0  # 0 means unknown
+    notes: str = ""  # optional health or behaviour notes, e.g. "stiff hips"
 
     def add_task(self, task: Task) -> None:
         """Add a task to this pet."""
