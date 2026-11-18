@@ -7,6 +7,11 @@ from pawpal_system import Owner, Pet, Task, Scheduler
 
 configure_logging()
 
+COMMON_SPECIES = [
+    "Dog", "Cat", "Rabbit", "Hamster", "Guinea pig", "Bird", "Fish",
+    "Turtle", "Lizard", "Snake", "Horse", "Ferret",
+]
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
 st.title("🐾 PawPal+")
@@ -38,11 +43,16 @@ with tab_pets:
     with col1:
         pet_name = st.text_input("Pet name", value="Mochi")
     with col2:
-        species = st.selectbox("Species", ["dog", "cat", "other"])
+        species_choice = st.selectbox("Species", COMMON_SPECIES + ["Other"])
+    species = species_choice.lower()
+    if species_choice == "Other":
+        species = st.text_input("Enter species", placeholder="e.g. ferret, axolotl").strip().lower()
 
     if st.button("Add pet"):
         if not pet_name.strip():
             st.error("Please enter a pet name.")
+        elif not species:
+            st.error("Please enter a species.")
         elif any(p.name.lower() == pet_name.strip().lower() for p in owner.pets):
             st.warning(f"{pet_name} is already on your list.")
         else:
